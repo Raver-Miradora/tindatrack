@@ -4358,6 +4358,281 @@ class AuditLogCompanion extends UpdateCompanion<AuditLogData> {
   }
 }
 
+class $CountDraftsTable extends CountDrafts
+    with TableInfo<$CountDraftsTable, CountDraft> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CountDraftsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES products (id)',
+    ),
+  );
+  static const VerificationMeta _actualQuantityMeta = const VerificationMeta(
+    'actualQuantity',
+  );
+  @override
+  late final GeneratedColumn<double> actualQuantity = GeneratedColumn<double>(
+    'actual_quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [productId, actualQuantity, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'count_drafts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CountDraft> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('actual_quantity')) {
+      context.handle(
+        _actualQuantityMeta,
+        actualQuantity.isAcceptableOrUnknown(
+          data['actual_quantity']!,
+          _actualQuantityMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_actualQuantityMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {productId};
+  @override
+  CountDraft map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CountDraft(
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      actualQuantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}actual_quantity'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CountDraftsTable createAlias(String alias) {
+    return $CountDraftsTable(attachedDatabase, alias);
+  }
+}
+
+class CountDraft extends DataClass implements Insertable<CountDraft> {
+  final String productId;
+  final double actualQuantity;
+  final DateTime updatedAt;
+  const CountDraft({
+    required this.productId,
+    required this.actualQuantity,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['product_id'] = Variable<String>(productId);
+    map['actual_quantity'] = Variable<double>(actualQuantity);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CountDraftsCompanion toCompanion(bool nullToAbsent) {
+    return CountDraftsCompanion(
+      productId: Value(productId),
+      actualQuantity: Value(actualQuantity),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CountDraft.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CountDraft(
+      productId: serializer.fromJson<String>(json['productId']),
+      actualQuantity: serializer.fromJson<double>(json['actualQuantity']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'productId': serializer.toJson<String>(productId),
+      'actualQuantity': serializer.toJson<double>(actualQuantity),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CountDraft copyWith({
+    String? productId,
+    double? actualQuantity,
+    DateTime? updatedAt,
+  }) => CountDraft(
+    productId: productId ?? this.productId,
+    actualQuantity: actualQuantity ?? this.actualQuantity,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CountDraft copyWithCompanion(CountDraftsCompanion data) {
+    return CountDraft(
+      productId: data.productId.present ? data.productId.value : this.productId,
+      actualQuantity: data.actualQuantity.present
+          ? data.actualQuantity.value
+          : this.actualQuantity,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CountDraft(')
+          ..write('productId: $productId, ')
+          ..write('actualQuantity: $actualQuantity, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(productId, actualQuantity, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CountDraft &&
+          other.productId == this.productId &&
+          other.actualQuantity == this.actualQuantity &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CountDraftsCompanion extends UpdateCompanion<CountDraft> {
+  final Value<String> productId;
+  final Value<double> actualQuantity;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CountDraftsCompanion({
+    this.productId = const Value.absent(),
+    this.actualQuantity = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CountDraftsCompanion.insert({
+    required String productId,
+    required double actualQuantity,
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : productId = Value(productId),
+       actualQuantity = Value(actualQuantity);
+  static Insertable<CountDraft> custom({
+    Expression<String>? productId,
+    Expression<double>? actualQuantity,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (productId != null) 'product_id': productId,
+      if (actualQuantity != null) 'actual_quantity': actualQuantity,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CountDraftsCompanion copyWith({
+    Value<String>? productId,
+    Value<double>? actualQuantity,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CountDraftsCompanion(
+      productId: productId ?? this.productId,
+      actualQuantity: actualQuantity ?? this.actualQuantity,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (actualQuantity.present) {
+      map['actual_quantity'] = Variable<double>(actualQuantity.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CountDraftsCompanion(')
+          ..write('productId: $productId, ')
+          ..write('actualQuantity: $actualQuantity, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4369,6 +4644,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AlertsTable alerts = $AlertsTable(this);
   late final $UsersTable users = $UsersTable(this);
   late final $AuditLogTable auditLog = $AuditLogTable(this);
+  late final $CountDraftsTable countDrafts = $CountDraftsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4382,6 +4658,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     alerts,
     users,
     auditLog,
+    countDrafts,
   ];
 }
 
@@ -4480,6 +4757,24 @@ final class $$ProductsTableReferences
     ).filter((f) => f.productId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_alertsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$CountDraftsTable, List<CountDraft>>
+  _countDraftsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.countDrafts,
+    aliasName: $_aliasNameGenerator(db.products.id, db.countDrafts.productId),
+  );
+
+  $$CountDraftsTableProcessedTableManager get countDraftsRefs {
+    final manager = $$CountDraftsTableTableManager(
+      $_db,
+      $_db.countDrafts,
+    ).filter((f) => f.productId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_countDraftsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -4641,6 +4936,31 @@ class $$ProductsTableFilterComposer
           }) => $$AlertsTableFilterComposer(
             $db: $db,
             $table: $db.alerts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> countDraftsRefs(
+    Expression<bool> Function($$CountDraftsTableFilterComposer f) f,
+  ) {
+    final $$CountDraftsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.countDrafts,
+      getReferencedColumn: (t) => t.productId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CountDraftsTableFilterComposer(
+            $db: $db,
+            $table: $db.countDrafts,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4888,6 +5208,31 @@ class $$ProductsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> countDraftsRefs<T extends Object>(
+    Expression<T> Function($$CountDraftsTableAnnotationComposer a) f,
+  ) {
+    final $$CountDraftsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.countDrafts,
+      getReferencedColumn: (t) => t.productId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CountDraftsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.countDrafts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ProductsTableTableManager
@@ -4907,6 +5252,7 @@ class $$ProductsTableTableManager
             bool stockInItemsRefs,
             bool countItemsRefs,
             bool alertsRefs,
+            bool countDraftsRefs,
           })
         > {
   $$ProductsTableTableManager(_$AppDatabase db, $ProductsTable table)
@@ -5009,6 +5355,7 @@ class $$ProductsTableTableManager
                 stockInItemsRefs = false,
                 countItemsRefs = false,
                 alertsRefs = false,
+                countDraftsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -5016,6 +5363,7 @@ class $$ProductsTableTableManager
                     if (stockInItemsRefs) db.stockInItems,
                     if (countItemsRefs) db.countItems,
                     if (alertsRefs) db.alerts,
+                    if (countDraftsRefs) db.countDrafts,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -5083,6 +5431,27 @@ class $$ProductsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (countDraftsRefs)
+                        await $_getPrefetchedData<
+                          Product,
+                          $ProductsTable,
+                          CountDraft
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProductsTableReferences
+                              ._countDraftsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProductsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).countDraftsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.productId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5107,6 +5476,7 @@ typedef $$ProductsTableProcessedTableManager =
         bool stockInItemsRefs,
         bool countItemsRefs,
         bool alertsRefs,
+        bool countDraftsRefs,
       })
     >;
 typedef $$StockInEventsTableCreateCompanionBuilder =
@@ -7590,6 +7960,289 @@ typedef $$AuditLogTableProcessedTableManager =
       AuditLogData,
       PrefetchHooks Function()
     >;
+typedef $$CountDraftsTableCreateCompanionBuilder =
+    CountDraftsCompanion Function({
+      required String productId,
+      required double actualQuantity,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CountDraftsTableUpdateCompanionBuilder =
+    CountDraftsCompanion Function({
+      Value<String> productId,
+      Value<double> actualQuantity,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$CountDraftsTableReferences
+    extends BaseReferences<_$AppDatabase, $CountDraftsTable, CountDraft> {
+  $$CountDraftsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $ProductsTable _productIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(db.countDrafts.productId, db.products.id),
+      );
+
+  $$ProductsTableProcessedTableManager get productId {
+    final $_column = $_itemColumn<String>('product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_productIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$CountDraftsTableFilterComposer
+    extends Composer<_$AppDatabase, $CountDraftsTable> {
+  $$CountDraftsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<double> get actualQuantity => $composableBuilder(
+    column: $table.actualQuantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ProductsTableFilterComposer get productId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CountDraftsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CountDraftsTable> {
+  $$CountDraftsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<double> get actualQuantity => $composableBuilder(
+    column: $table.actualQuantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ProductsTableOrderingComposer get productId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CountDraftsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CountDraftsTable> {
+  $$CountDraftsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<double> get actualQuantity => $composableBuilder(
+    column: $table.actualQuantity,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$ProductsTableAnnotationComposer get productId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CountDraftsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CountDraftsTable,
+          CountDraft,
+          $$CountDraftsTableFilterComposer,
+          $$CountDraftsTableOrderingComposer,
+          $$CountDraftsTableAnnotationComposer,
+          $$CountDraftsTableCreateCompanionBuilder,
+          $$CountDraftsTableUpdateCompanionBuilder,
+          (CountDraft, $$CountDraftsTableReferences),
+          CountDraft,
+          PrefetchHooks Function({bool productId})
+        > {
+  $$CountDraftsTableTableManager(_$AppDatabase db, $CountDraftsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CountDraftsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CountDraftsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CountDraftsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> productId = const Value.absent(),
+                Value<double> actualQuantity = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CountDraftsCompanion(
+                productId: productId,
+                actualQuantity: actualQuantity,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String productId,
+                required double actualQuantity,
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CountDraftsCompanion.insert(
+                productId: productId,
+                actualQuantity: actualQuantity,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$CountDraftsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({productId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (productId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.productId,
+                                referencedTable: $$CountDraftsTableReferences
+                                    ._productIdTable(db),
+                                referencedColumn: $$CountDraftsTableReferences
+                                    ._productIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$CountDraftsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CountDraftsTable,
+      CountDraft,
+      $$CountDraftsTableFilterComposer,
+      $$CountDraftsTableOrderingComposer,
+      $$CountDraftsTableAnnotationComposer,
+      $$CountDraftsTableCreateCompanionBuilder,
+      $$CountDraftsTableUpdateCompanionBuilder,
+      (CountDraft, $$CountDraftsTableReferences),
+      CountDraft,
+      PrefetchHooks Function({bool productId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7610,4 +8263,6 @@ class $AppDatabaseManager {
       $$UsersTableTableManager(_db, _db.users);
   $$AuditLogTableTableManager get auditLog =>
       $$AuditLogTableTableManager(_db, _db.auditLog);
+  $$CountDraftsTableTableManager get countDrafts =>
+      $$CountDraftsTableTableManager(_db, _db.countDrafts);
 }

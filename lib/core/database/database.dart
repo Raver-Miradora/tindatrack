@@ -7,12 +7,12 @@ import 'tables.dart';
 
 part 'database.g.dart';
 
-@DriftDatabase(tables: [Products, StockInEvents, StockInItems, CountSessions, CountItems, Alerts, Users, AuditLog])
+@DriftDatabase(tables: [Products, StockInEvents, StockInItems, CountSessions, CountItems, Alerts, Users, AuditLog, CountDrafts])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -37,6 +37,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 4) {
           // Add currentStock column to products
           await m.addColumn(products, products.currentStock);
+        }
+
+        if (from < 5) {
+          // Add countDrafts table
+          await m.createTable(countDrafts);
         }
       },
       beforeOpen: (details) async {

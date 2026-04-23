@@ -122,3 +122,13 @@ class AuditLog extends Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+// CountDrafts Table for persistence
+class CountDrafts extends Table {
+  TextColumn get productId => text().references(Products, #id)();
+  RealColumn get actualQuantity => real()();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
