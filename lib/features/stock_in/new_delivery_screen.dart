@@ -3,371 +3,239 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'delivery_controller.dart';
 import 'widgets/scanner_view.dart';
+import 'widgets/item_edit_dialog.dart';
 import 'widgets/product_search_delegate.dart';
+import '../../core/database/database.dart';
 import '../../core/providers.dart';
-import '../../core/database/database.dart'; // REQUIRED IMPORT
+import '../../core/logic/haptics.dart';
 
 class NewDeliveryScreen extends ConsumerWidget {
   const NewDeliveryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(deliveryCartProvider);
-    final theme = Theme.of(context);
+    final cartState = ref.watch(deliveryCartProvider);
+    final cart = cartState.items;
+    final totalCost = cartState.totalValue;
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('New Delivery'),
+        title: const Text('New Delivery', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
-          if (state.items.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: TextButton.icon(
-                onPressed: state.isSaving ? null : () => _confirmSave(context, ref),
-                icon: state.isSaving 
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.check_circle_outline, color: Colors.green),
-                label: Text(
-                  state.isSaving ? 'Saving...' : 'Save', 
-                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)
-                ),
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () => _openScanner(context, ref),
+            tooltip: 'Scan Barcode',
+          ),
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => _openSearch(context, ref),
+            tooltip: 'Search Product',
+          ),
         ],
       ),
       body: Column(
         children: [
-          _buildSupplierHeader(context, ref, state),
           Expanded(
-            child: state.items.isEmpty
-                ? _buildEmptyState(context)
+            child: cart.isEmpty
+                ? _buildEmptyState()
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: state.items.length,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: cart.length,
                     itemBuilder: (context, index) {
-                      final item = state.items[index];
-                      return _buildDismissibleItem(context, ref, item);
+                      final item = cart[index];
+                      return _buildCartItem(context, ref, item);
                     },
                   ),
           ),
-          _buildCartSummary(context, state),
+          _buildSummaryFooter(context, ref, cart.length, totalCost),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: state.isSaving ? null : () => _showAddOptions(context, ref),
-        backgroundColor: state.isSaving ? Colors.grey : theme.primaryColor,
-        icon: const Icon(Icons.add_shopping_cart, color: Colors.white),
-        label: const Text('Add Items', style: TextStyle(color: Colors.white)),
-      ),
     );
   }
 
-  Widget _buildSupplierHeader(BuildContext context, WidgetRef ref, DeliveryCartState state) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: TextField(
-        onChanged: (val) => ref.read(deliveryCartProvider.notifier).setSupplier(val),
-        enabled: !state.isSaving,
-        decoration: InputDecoration(
-          prefixIcon: const Icon(Icons.business_outlined),
-          hintText: 'Supplier Name (Optional)',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-          filled: true,
-          fillColor: Colors.grey.shade100,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey.shade300),
           const SizedBox(height: 16),
-          Text('No items added yet', style: TextStyle(color: Colors.grey.shade500, fontSize: 18)),
+          const Text('Your cart is empty', style: TextStyle(color: Colors.grey, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text('Tap the button below to scan or search', style: TextStyle(color: Colors.grey.shade400)),
+          const Text('Scan a barcode or search to add items', style: TextStyle(color: Colors.grey)),
         ],
       ),
     );
   }
 
-  Widget _buildDismissibleItem(BuildContext context, WidgetRef ref, DeliveryCartItem item) {
+  Widget _buildCartItem(BuildContext context, WidgetRef ref, DeliveryCartItem item) {
     return Dismissible(
-      key: Key('cart_item_${item.product.id}'),
+      key: Key(item.product.id),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.red.shade400,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Icon(Icons.delete_outline, color: Colors.white),
+        padding: const EdgeInsets.only(right: 20),
+        color: Colors.red,
+        child: const Icon(Icons.delete, color: Colors.white),
       ),
       onDismissed: (_) {
+        TindaHaptics.selection();
         ref.read(deliveryCartProvider.notifier).removeItem(item.product.id);
       },
-      child: _buildCartItem(context, ref, item),
-    );
-  }
-
-  Widget _buildCartItem(BuildContext context, WidgetRef ref, DeliveryCartItem item) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.shopping_bag_outlined, color: Colors.green),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  InkWell(
-                    onTap: () => _showCostEditDialog(context, ref, item),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Unit Cost: PHP ${item.unitCost.toStringAsFixed(2)}', style: TextStyle(color: Colors.blue.shade700, fontSize: 12, decoration: TextDecoration.underline)),
-                        const SizedBox(width: 4),
-                        Icon(Icons.edit, size: 12, color: Colors.blue.shade700),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            _buildQuantityControls(ref, item),
-          ],
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.shade200)),
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(16),
+          title: Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text('Cost: PHP ${item.unitCost.toStringAsFixed(2)} per ${item.product.unit}'),
+              Text('Subtotal: PHP ${(item.quantity * item.unitCost).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+            ],
+          ),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
+            child: Text('${item.quantity.toInt()} ${item.product.unit}', style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.bold)),
+          ),
+          onTap: () => _editItem(context, ref, item),
         ),
       ),
     );
   }
 
-  Widget _buildQuantityControls(WidgetRef ref, DeliveryCartItem item) {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: () {
-            if (item.quantity > 1) {
-              ref.read(deliveryCartProvider.notifier).updateQuantity(item.product.id, item.quantity - 1);
-            } else {
-              ref.read(deliveryCartProvider.notifier).removeItem(item.product.id);
-            }
-          },
-          icon: Icon(item.quantity > 1 ? Icons.remove_circle_outline : Icons.delete_outline, color: Colors.grey),
-        ),
-        Text('${item.quantity.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        IconButton(
-          onPressed: () => ref.read(deliveryCartProvider.notifier).updateQuantity(item.product.id, item.quantity + 1),
-          icon: const Icon(Icons.add_circle_outline, color: Colors.green),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCartSummary(BuildContext context, DeliveryCartState state) {
-    if (state.items.isEmpty) return const SizedBox.shrink();
-
+  Widget _buildSummaryFooter(BuildContext context, WidgetRef ref, int itemCount, double totalCost) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))],
       ),
       child: SafeArea(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Total Value', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                Text('PHP ${state.totalValue.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-              ],
-            ),
-            Text('${state.items.length} unique items', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddOptions(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildOptionTile(
-              context,
-              icon: Icons.qr_code_scanner_rounded,
-              title: 'Scan Barcode',
-              subtitle: 'Use camera to add items',
-              color: Colors.blue,
-              onTap: () => _handleBarcodeScan(context, ref),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Delivery Summary', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    Text(
+                      'PHP ${totalCost.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+                ElevatedButton(
+                  onPressed: itemCount == 0 ? null : () => _saveDelivery(context, ref),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                  child: const Text('Save Delivery', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            _buildOptionTile(
-              context,
-              icon: Icons.search_rounded,
-              title: 'Search Product',
-              subtitle: 'Find by name or category',
-              color: Colors.orange,
-              onTap: () async {
-                Navigator.pop(context);
-                final db = ref.read(databaseProvider);
-                final products = await db.select(db.products).get();
-                
-                if (context.mounted) {
-                  final product = await showSearch<Product?>(
-                    context: context,
-                    delegate: ProductSearchDelegate(products),
-                  );
-                  if (product != null) {
-                    ref.read(deliveryCartProvider.notifier).addProduct(product);
-                  }
-                }
-              },
-            ),
-            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _handleBarcodeScan(BuildContext context, WidgetRef ref) async {
-    Navigator.pop(context);
-    final barcode = await Navigator.push<String>(
+  void _openScanner(BuildContext context, WidgetRef ref) async {
+    TindaHaptics.selection();
+    final result = await Navigator.push<String>(
       context,
-      MaterialPageRoute(builder: (_) => const ScannerView()),
+      MaterialPageRoute(builder: (context) => const ScannerView()),
     );
-    
-    if (barcode != null) {
-      final db = ref.read(databaseProvider);
-      final product = await (db.select(db.products)..where((p) => p.barcode.equals(barcode))).getSingleOrNull();
-      
-      if (product != null) {
-        ref.read(deliveryCartProvider.notifier).addProduct(product);
-      } else {
-        if (context.mounted) {
-          _showProductNotFoundDialog(context, barcode);
-        }
+    if (result != null) {
+      final found = await ref.read(deliveryCartProvider.notifier).addProductByBarcode(result);
+      if (!found && context.mounted) {
+        TindaHaptics.warning();
+        _promptCreateProduct(context, ref, result);
       }
     }
   }
 
-  void _showProductNotFoundDialog(BuildContext context, String barcode) {
+  void _promptCreateProduct(BuildContext context, WidgetRef ref, String barcode) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Product Not Found'),
-        content: Text('The barcode "$barcode" is not in your inventory. Would you like to add it now?'),
+        content: Text('The barcode "$barcode" is not in your inventory. Would you like to create it now?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Dismiss')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Navigate to "Create Product" (Coming Soon)')));
-            },
-            child: const Text('Create Product'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCostEditDialog(BuildContext context, WidgetRef ref, DeliveryCartItem item) {
-    final controller = TextEditingController(text: item.unitCost.toString());
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit Unit Cost: ${item.product.name}'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: const InputDecoration(prefixText: 'PHP ', labelText: 'New Unit Cost'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              final newCost = double.tryParse(controller.text);
-              if (newCost != null) {
-                ref.read(deliveryCartProvider.notifier).updateUnitCost(item.product.id, newCost);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOptionTile(BuildContext context, {required IconData icon, required String title, required String subtitle, required Color color, required VoidCallback onTap}) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-        child: Icon(icon, color: color),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-      trailing: const Icon(Icons.chevron_right),
-    );
-  }
-
-  void _confirmSave(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Delivery'),
-        content: const Text('This will update your estimated stock and baseline average costs. Proceed?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Maybe Later')),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await ref.read(deliveryCartProvider.notifier).saveDelivery();
-              if (context.mounted) {
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Delivery saved successfully!')));
-                  context.pop();
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save delivery.'), backgroundColor: Colors.red));
-                }
+              final newProduct = await context.push<Product?>('/inventory/create', extra: barcode);
+              if (newProduct != null) {
+                ref.read(deliveryCartProvider.notifier).addProduct(newProduct);
               }
             },
-            child: const Text('Confirm'),
+            child: const Text('Create Now'),
           ),
         ],
       ),
     );
+  }
+
+  void _openSearch(BuildContext context, WidgetRef ref) async {
+    TindaHaptics.selection();
+    final db = ref.read(databaseProvider);
+    final products = await db.select(db.products).get();
+    
+    if (context.mounted) {
+      final result = await showSearch<dynamic>(
+        context: context,
+        delegate: ProductSearchDelegate(products),
+      );
+      
+      if (result is Product) {
+        ref.read(deliveryCartProvider.notifier).addProduct(result);
+      }
+    }
+  }
+
+  void _editItem(BuildContext context, WidgetRef ref, DeliveryCartItem item) async {
+    TindaHaptics.light();
+    showDialog(
+      context: context,
+      builder: (context) => ItemEditDialog(
+        item: item,
+        onConfirm: (qty, cost) {
+          ref.read(deliveryCartProvider.notifier).updateQuantity(item.product.id, qty);
+          ref.read(deliveryCartProvider.notifier).updateUnitCost(item.product.id, cost);
+        },
+        onRemove: () {
+          ref.read(deliveryCartProvider.notifier).removeItem(item.product.id);
+        },
+      ),
+    );
+  }
+
+  void _saveDelivery(BuildContext context, WidgetRef ref) async {
+    TindaHaptics.success();
+    final success = await ref.read(deliveryCartProvider.notifier).saveDelivery();
+    if (context.mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Delivery saved successfully!')));
+        context.pop();
+      } else {
+        TindaHaptics.warning();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error saving delivery'), backgroundColor: Colors.red));
+      }
+    }
   }
 }
