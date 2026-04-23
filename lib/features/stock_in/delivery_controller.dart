@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../core/database/database.dart';
 import '../../core/providers.dart';
+import '../../core/logic/haptics.dart';
 
 class DeliveryCartItem {
   final Product product;
@@ -67,7 +67,7 @@ class DeliveryCartNotifier extends Notifier<DeliveryCartState> {
   }
 
   void addProduct(Product product) {
-    HapticFeedback.lightImpact();
+    TindaHaptics.light();
     final existingIndex = state.items.indexWhere((item) => item.product.id == product.id);
     if (existingIndex != -1) {
       final updatedItems = List<DeliveryCartItem>.from(state.items);
@@ -83,6 +83,17 @@ class DeliveryCartNotifier extends Notifier<DeliveryCartState> {
         ],
       );
     }
+  }
+
+  Future<bool> addProductByBarcode(String barcode) async {
+    final db = ref.read(databaseProvider);
+    final product = await (db.select(db.products)..where((p) => p.barcode.equals(barcode))).getSingleOrNull();
+    
+    if (product != null) {
+      addProduct(product);
+      return true;
+    }
+    return false;
   }
 
   void updateQuantity(String productId, double quantity) {
@@ -108,7 +119,7 @@ class DeliveryCartNotifier extends Notifier<DeliveryCartState> {
   }
 
   void removeItem(String productId) {
-    HapticFeedback.mediumImpact();
+    TindaHaptics.selection();
     state = state.copyWith(
       items: state.items.where((item) => item.product.id != productId).toList(),
     );
@@ -127,8 +138,8 @@ class DeliveryCartNotifier extends Notifier<DeliveryCartState> {
     try {
       final eventId = const Uuid().v4();
       final now = DateTime.now();
+      final supplier = state.supplierName.isEmpty ? 'General Supplier' : state.supplierName;
 
-      // OPTIMIZATION: Fetch all affected products in ONE query before transaction
       final productIds = state.items.map((i) => i.product.id).toList();
       final productsList = await (db.select(db.products)..where((p) => p.id.isIn(productIds))).get();
       final productMap = {for (var p in productsList) p.id: p};
@@ -138,13 +149,13 @@ class DeliveryCartNotifier extends Notifier<DeliveryCartState> {
         await db.into(db.stockInEvents).insert(
           StockInEventsCompanion.insert(
             id: eventId,
-            supplierName: state.supplierName.isEmpty ? 'General Supplier' : state.supplierName,
+            supplierName: supplier,
             deliveryDate: now,
             createdAt: drift.Value(now),
           ),
         );
 
-        // 2. Create StockInItems & Update Product Baseline Stock
+        // 2. Create StockInItems & Update Products
         for (final item in state.items) {
           final currentProduct = productMap[item.product.id];
           if (currentProduct == null) continue;
@@ -159,39 +170,33 @@ class DeliveryCartNotifier extends Notifier<DeliveryCartState> {
             ),
           );
 
-          // Update product's baseline stock (currentStock) and average cost
           await (db.update(db.products)..where((p) => p.id.equals(item.product.id)))
             .write(ProductsCompanion(
               averageCost: drift.Value(item.unitCost),
               currentStock: drift.Value(currentProduct.currentStock + item.quantity),
               updatedAt: drift.Value(now),
             ));
-          
-          // 3. Log to Audit Log with Before/After snapshots
-          await db.into(db.auditLog).insert(
-            AuditLogCompanion.insert(
-              id: const Uuid().v4(),
-              actionType: 'Stock In (Delivery)',
-              targetType: 'product',
-              targetId: item.product.id,
-              beforeSnapshot: drift.Value(jsonEncode({
-                "estimated_stock": currentProduct.currentStock,
-                "average_cost": currentProduct.averageCost,
-              })),
-              afterSnapshot: drift.Value(jsonEncode({
-                "quantity_added": item.quantity,
-                "new_estimated_stock": currentProduct.currentStock + item.quantity,
-                "unit_cost": item.unitCost,
-                "supplier": state.supplierName,
-              })),
-              timestamp: drift.Value(now),
-            ),
-          );
         }
+
+        // 3. Create ONE Unified Audit Log Entry for the entire delivery
+        await db.into(db.auditLog).insert(
+          AuditLogCompanion.insert(
+            id: const Uuid().v4(),
+            actionType: 'New Delivery',
+            targetType: 'StockInEvent',
+            targetId: eventId,
+            afterSnapshot: drift.Value(jsonEncode({
+              "supplier": supplier,
+              "itemCount": state.items.length,
+              "totalValue": state.totalValue,
+            })),
+            timestamp: drift.Value(now),
+          ),
+        );
       });
 
-      state = DeliveryCartState(); // Reset
-      HapticFeedback.heavyImpact();
+      state = DeliveryCartState(); 
+      TindaHaptics.success();
       return true;
     } catch (e) {
       return false;
