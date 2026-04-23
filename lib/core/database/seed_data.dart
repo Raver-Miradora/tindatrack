@@ -2,84 +2,261 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import 'database.dart';
 
-class DatabaseSeeder {
-  static Future<void> seedInitialData(AppDatabase db) async {
-    // Check if products already exist to avoid double seeding
-    final results = await db.select(db.products).get();
-    if (results.isNotEmpty) return;
+Future<void> seedDatabase(AppDatabase db) async {
+  final count = await db.select(db.products).get();
+  if (count.isNotEmpty) return;
 
-    final baseProducts = [
-      _product('Nescafe Original Twin Pack', 'Beverages', 'pack', 25.0, 15),
-      _product('Marlboro Red (Pack)', 'Tobacco', 'pack', 150.0, 5),
-      _product('Lucky Me Pancit Canton Original', 'Noodles', 'piece', 18.0, 20),
-      _product('Coca-Cola 1.5L', 'Beverages', 'bottle', 75.0, 10),
-      _product('Coca-Cola Mismo', 'Beverages', 'bottle', 20.0, 15),
-      _product('Bear Brand Powdered Milk 33g', 'Dairy', 'sachet', 15.0, 20),
-      _product('Kopiko Brown Twin Pack', 'Beverages', 'pack', 25.0, 15),
-      _product('Magic Flakes Crackers', 'Snacks', 'pack', 8.0, 30),
-      _product('SkyFlakes Crackers', 'Snacks', 'pack', 8.0, 30),
-      _product('Datu Puti Vinegar 200ml', 'Condiments', 'pouch', 15.0, 10),
-      _product('Datu Puti Soy Sauce 200ml', 'Condiments', 'pouch', 15.0, 10),
-      _product('Silver Swan Soy Sauce 200ml', 'Condiments', 'pouch', 15.0, 10),
-      _product('Mang Tomas All-Around Sarsa', 'Condiments', 'bottle', 35.0, 5),
-      _product('UFC Banana Ketchup', 'Condiments', 'pouch', 20.0, 10),
-      _product('San Miguel Pale Pilsen', 'Alcohol', 'bottle', 50.0, 12),
-      _product('Red Horse Extra Strong', 'Alcohol', 'bottle', 65.0, 12),
-      _product('Emperador Light 750ml', 'Alcohol', 'bottle', 140.0, 3),
-      _product('Ginebra San Miguel 350ml', 'Alcohol', 'bottle', 70.0, 5),
-      _product('Surf Powder Cherry Blossom 65g', 'Laundry', 'sachet', 12.0, 20),
-      _product('Ariel Powder Sunrise Fresh 70g', 'Laundry', 'sachet', 15.0, 20),
-      _product('Champion Detergent Bar', 'Laundry', 'piece', 20.0, 10),
-      _product('Palmolive Naturals Shampoo', 'Personal Care', 'sachet', 7.0, 30),
-      _product('Sunsilk Smooth & Manageable', 'Personal Care', 'sachet', 7.0, 30),
-      _product('Creamsilk Standout Straight', 'Personal Care', 'sachet', 7.0, 30),
-      _product('Safeguard Pure White Soap 60g', 'Personal Care', 'piece', 25.0, 10),
-      _product('Rexona Men Ice Cool Sachet', 'Personal Care', 'sachet', 15.0, 15),
-      _product('Modess Cottony Soft Regular', 'Personal Care', 'pack', 35.0, 10),
-      _product('Pampers Baby Dry Taped S', 'Diapers', 'piece', 12.0, 30),
-      _product('EQ Dry Diaper S', 'Diapers', 'piece', 9.0, 30),
-      _product('C2 Classic Lemon 500ml', 'Beverages', 'bottle', 30.0, 10),
-      _product('C2 Apple 500ml', 'Beverages', 'bottle', 30.0, 10),
-      _product('Gatorade Blue Bolt 500ml', 'Beverages', 'bottle', 40.0, 5),
-      _product('Sting Energy Drink 300ml', 'Beverages', 'bottle', 20.0, 10),
-      _product('Cobra Energy Drink', 'Beverages', 'bottle', 20.0, 10),
-      _product('Piattos Cheese', 'Snacks', 'pack', 18.0, 15),
-      _product('Chippy BBQ', 'Snacks', 'pack', 18.0, 15),
-      _product('Mr. Chips Nacho Cheese', 'Snacks', 'pack', 18.0, 15),
-      _product('V-Cut Spicy BBQ', 'Snacks', 'pack', 18.0, 10),
-      _product('Nova Multigrain Snacks', 'Snacks', 'pack', 18.0, 10),
-      _product('Boy Bawang Garlic', 'Snacks', 'pack', 15.0, 20),
-      _product('Rebisco Hansel Sandwich', 'Snacks', 'pack', 10.0, 20),
-      _product('Fita Crackers', 'Snacks', 'pack', 10.0, 20),
-      _product('Oreo Cookies Vanilla', 'Snacks', 'pack', 15.0, 20),
-      _product('Great Taste White Twin Pack', 'Beverages', 'pack', 25.0, 15),
-      _product('Energen Chocolate', 'Beverages', 'sachet', 15.0, 20),
-      _product('Milo Everyday Sachet 24g', 'Beverages', 'sachet', 12.0, 20),
-      _product('Lipton Yellow Label Tea', 'Beverages', 'piece', 10.0, 20),
-      _product('Del Monte Fit n Right 330ml', 'Beverages', 'bottle', 35.0, 5),
-      _product('Chuckie Chocolate Milk', 'Dairy', 'piece', 28.0, 10),
-      _product('Fitnesse Cereal Bar', 'Snacks', 'piece', 20.0, 10),
-    ];
+  const uuid = Uuid();
+  final now = DateTime.now();
 
-    await db.batch((batch) {
-      batch.insertAll(db.products, baseProducts);
-    });
-  }
+  final List<ProductsCompanion> seeds = [
+    // Beverages
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Coca-Cola 290ml',
+      category: 'Beverages',
+      unit: 'bottle',
+      barcode: const Value('5449000000996'),
+      reorderPoint: 24,
+      currentStock: const Value(48),
+      averageCost: const Value(15.0),
+      averageSellingPrice: const Value(20.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Nescafe Stick',
+      category: 'Beverages',
+      unit: 'sachet',
+      barcode: const Value('4800361305018'),
+      reorderPoint: 50,
+      currentStock: const Value(120),
+      averageCost: const Value(6.0),
+      averageSellingPrice: const Value(10.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Bear Brand 33g',
+      category: 'Beverages',
+      unit: 'sachet',
+      barcode: const Value('4800361361533'),
+      reorderPoint: 20,
+      currentStock: const Value(60),
+      averageCost: const Value(12.0),
+      averageSellingPrice: const Value(16.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Milo 22g',
+      category: 'Beverages',
+      unit: 'sachet',
+      barcode: const Value('4800361324118'),
+      reorderPoint: 30,
+      currentStock: const Value(80),
+      averageCost: const Value(10.0),
+      averageSellingPrice: const Value(14.0),
+    ),
+    
+    // Canned Goods
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: '555 Sardines Tomato',
+      category: 'Canned Goods',
+      unit: 'can',
+      barcode: const Value('4800016010023'),
+      reorderPoint: 12,
+      currentStock: const Value(24),
+      averageCost: const Value(18.0),
+      averageSellingPrice: const Value(22.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Century Tuna Flakes Oil 155g',
+      category: 'Canned Goods',
+      unit: 'can',
+      barcode: const Value('4800016641555'),
+      reorderPoint: 10,
+      currentStock: const Value(15),
+      averageCost: const Value(35.0),
+      averageSellingPrice: const Value(42.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Argentina Corned Beef 150g',
+      category: 'Canned Goods',
+      unit: 'can',
+      barcode: const Value('4800016101509'),
+      reorderPoint: 15,
+      currentStock: const Value(20),
+      averageCost: const Value(38.0),
+      averageSellingPrice: const Value(45.0),
+    ),
 
-  static ProductsCompanion _product(
-    String name,
-    String category,
-    String unit,
-    double cost,
-    double reorder,
-  ) {
-    return ProductsCompanion.insert(
-      id: const Uuid().v4(),
-      name: name,
-      category: category,
-      unit: unit,
-      averageCost: Value(cost),
-      reorderPoint: reorder,
-    );
-  }
+    // Snacks
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Skyflakes 10s',
+      category: 'Snacks',
+      unit: 'pack',
+      barcode: const Value('4800045101013'),
+      reorderPoint: 10,
+      currentStock: const Value(25),
+      averageCost: const Value(45.0),
+      averageSellingPrice: const Value(55.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Piattos Cheese 40g',
+      category: 'Snacks',
+      unit: 'pack',
+      barcode: const Value('4800016603034'),
+      reorderPoint: 20,
+      currentStock: const Value(30),
+      averageCost: const Value(12.0),
+      averageSellingPrice: const Value(16.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Nova Multigrain 40g',
+      category: 'Snacks',
+      unit: 'pack',
+      barcode: const Value('4800016604048'),
+      reorderPoint: 15,
+      currentStock: const Value(20),
+      averageCost: const Value(13.0),
+      averageSellingPrice: const Value(18.0),
+    ),
+
+    // Personal Care
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Pantisne Shampoo 12ml',
+      category: 'Personal Care',
+      unit: 'sachet',
+      barcode: const Value('4902430882149'),
+      reorderPoint: 24,
+      currentStock: const Value(48),
+      averageCost: const Value(5.5),
+      averageSellingPrice: const Value(8.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Sunlight Soap Sachet',
+      category: 'Personal Care',
+      unit: 'sachet',
+      barcode: const Value('4800067890123'),
+      reorderPoint: 12,
+      currentStock: const Value(24),
+      averageCost: const Value(6.0),
+      averageSellingPrice: const Value(10.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'SafeGuard White 60g',
+      category: 'Personal Care',
+      unit: 'pcs',
+      barcode: const Value('4902430412345'),
+      reorderPoint: 10,
+      currentStock: const Value(12),
+      averageCost: const Value(22.0),
+      averageSellingPrice: const Value(28.0),
+    ),
+
+    // Condiments & Pantry
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Silver Swan Soy Sauce 200ml',
+      category: 'Condiments',
+      unit: 'pack',
+      barcode: const Value('4800011122233'),
+      reorderPoint: 12,
+      currentStock: const Value(15),
+      averageCost: const Value(10.0),
+      averageSellingPrice: const Value(14.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Datu Puti Vinegar 200ml',
+      category: 'Condiments',
+      unit: 'pack',
+      barcode: const Value('4800011122244'),
+      reorderPoint: 12,
+      currentStock: const Value(15),
+      averageCost: const Value(9.0),
+      averageSellingPrice: const Value(13.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Magic Sarap 8g',
+      category: 'Condiments',
+      unit: 'sachet',
+      barcode: const Value('4800361345678'),
+      reorderPoint: 50,
+      currentStock: const Value(100),
+      averageCost: const Value(3.5),
+      averageSellingPrice: const Value(5.0),
+    ),
+    
+    // Household
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Tide Powder Sachet',
+      category: 'Household',
+      unit: 'sachet',
+      barcode: const Value('4902430999999'),
+      reorderPoint: 48,
+      currentStock: const Value(72),
+      averageCost: const Value(7.0),
+      averageSellingPrice: const Value(11.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Surf Fabcon Sachet',
+      category: 'Household',
+      unit: 'sachet',
+      barcode: const Value('4800067123456'),
+      reorderPoint: 36,
+      currentStock: const Value(60),
+      averageCost: const Value(5.5),
+      averageSellingPrice: const Value(9.0),
+    ),
+
+    // More Alcohol & Cigarettes (Common in Sari-sari)
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'San Miguel Pale Pilsen 320ml',
+      category: 'Alcohol',
+      unit: 'bottle',
+      barcode: const Value('4800057011010'),
+      reorderPoint: 24,
+      currentStock: const Value(36),
+      averageCost: const Value(35.0),
+      averageSellingPrice: const Value(45.0),
+    ),
+    ProductsCompanion.insert(
+      id: uuid.v4(),
+      name: 'Red Horse Stallion 330ml',
+      category: 'Alcohol',
+      unit: 'bottle',
+      barcode: const Value('4800057011027'),
+      reorderPoint: 24,
+      currentStock: const Value(36),
+      averageCost: const Value(38.0),
+      averageSellingPrice: const Value(48.0),
+    ),
+  ];
+
+  await db.batch((batch) {
+    batch.insertAll(db.products, seeds);
+  });
+
+  // Seed initial Audit Log
+  await db.into(db.auditLog).insert(
+    AuditLogCompanion.insert(
+      id: uuid.v4(),
+      actionType: 'System Setup',
+      targetType: 'database',
+      targetId: 'initial_seed',
+      timestamp: Value(now),
+    ),
+  );
 }
