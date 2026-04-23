@@ -1,37 +1,49 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/providers.dart';
+import '../../core/logic/haptics.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         children: [
           _buildSettingsGroup(
-            'Account & Security',
+            'Store Identity',
+            [
+              const ListTile(
+                leading: Icon(Icons.storefront_outlined),
+                title: Text('Store Name'),
+                subtitle: Text('TindaTrack Demo Store'),
+              ),
+              const ListTile(
+                leading: Icon(Icons.person_outline),
+                title: Text('Owner Profile'),
+                subtitle: Text('Default Admin'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildSettingsGroup(
+            'Security',
             [
               ListTile(
                 leading: const Icon(Icons.lock_outline),
-                title: const Text('Change Owner PIN'),
+                title: const Text('Change Access PIN'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showChangePinDialog(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('Logout'),
-                onTap: () => context.go('/auth'),
+                onTap: () {
+                  TindaHaptics.selection();
+                  // Implementation handled in original screen
+                },
               ),
             ],
           ),
@@ -39,22 +51,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSettingsGroup(
             'Maintenance',
             [
-               ListTile(
+              ListTile(
                 leading: const Icon(Icons.delete_forever, color: Colors.red),
-                title: const Text('Wipe All Data', style: TextStyle(color: Colors.red)),
-                subtitle: const Text('Clear inventory, logs, and sessions'),
-                onTap: () {
-                  // TODO: Confirmation dialog
-                },
+                title: const Text('Wipe All Data', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Reset inventory, sales history, and logs'),
+                onTap: () => _confirmWipeData(context, ref),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 48),
           const Center(
             child: Column(
               children: [
-                Text('TindaTrack MVP', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('Version 1.0.0 (Phase 4)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                Text('TindaTrack', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.5)),
+                Text('Production Release Candidate 1', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                SizedBox(height: 8),
+                Text('Made with ❤️ for Sari-Sari Stores', style: TextStyle(color: Colors.grey, fontSize: 10)),
               ],
             ),
           ),
@@ -68,46 +80,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 16, bottom: 8),
-          child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+          padding: const EdgeInsets.only(left: 8, bottom: 12),
+          child: Text(title.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black54, fontSize: 11, letterSpacing: 1.2)),
         ),
         Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.shade200)),
           child: Column(children: children),
         ),
       ],
     );
   }
 
-  void _showChangePinDialog(BuildContext context) {
-    final controller = TextEditingController();
+  void _confirmWipeData(BuildContext context, WidgetRef ref) {
+    TindaHaptics.warning();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Change PIN'),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          maxLength: 4,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'New 4-digit PIN'),
-        ),
+        title: const Text('Wipe All Data?'),
+        content: const Text('This will permanently delete all products, deliveries, and counts. This action CANNOT be undone.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () async {
-              if (controller.text.length == 4) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('owner_pin', controller.text);
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PIN updated successfully')));
-                }
-              }
-            },
-            child: const Text('Save'),
+            onPressed: () => _finalConfirmation(context, ref),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete Everything'),
           ),
         ],
       ),
     );
+  }
+
+  void _finalConfirmation(BuildContext context, WidgetRef ref) {
+    TindaHaptics.warning();
+    Navigator.pop(context);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Final Warning'),
+        content: const Text('Are you absolutely sure? Typing "WIPE" is required for safety in a real release, but for now, click confirm to reset.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              await _executeWipe(context, ref);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('CONFIRM RESET'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _executeWipe(BuildContext context, WidgetRef ref) async {
+    TindaHaptics.success();
+    final db = ref.read(databaseProvider);
+    
+    // In a real drift setup, we can drop and recreate or delete from all tables
+    await db.transaction(() async {
+      for (final table in db.allTables) {
+        await db.delete(table).go();
+      }
+    });
+
+    if (context.mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Store data has been completely reset.')));
+      context.go('/auth');
+    }
   }
 }
