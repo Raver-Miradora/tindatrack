@@ -16,7 +16,7 @@ void main() async {
 
   // Initialize Database and Seed Data
   final db = AppDatabase();
-  await DatabaseSeeder.seedInitialData(db);
+  await seedDatabase(db);
 
   runApp(
     ProviderScope(
@@ -37,7 +37,7 @@ class TindaTrackApp extends ConsumerWidget {
       title: 'TindaTrack',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      routerConfig: goRouter,
+      routerConfig: router,
     );
   }
 }
