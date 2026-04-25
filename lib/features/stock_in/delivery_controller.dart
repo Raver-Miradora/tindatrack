@@ -10,22 +10,26 @@ class DeliveryCartItem {
   final Product product;
   final double quantity;
   final double unitCost;
+  final double unitSellingPrice;
 
   DeliveryCartItem({
     required this.product,
     this.quantity = 1.0,
     required this.unitCost,
+    required this.unitSellingPrice,
   });
 
   DeliveryCartItem copyWith({
     Product? product,
     double? quantity,
     double? unitCost,
+    double? unitSellingPrice,
   }) {
     return DeliveryCartItem(
       product: product ?? this.product,
       quantity: quantity ?? this.quantity,
       unitCost: unitCost ?? this.unitCost,
+      unitSellingPrice: unitSellingPrice ?? this.unitSellingPrice,
     );
   }
 }
@@ -79,21 +83,25 @@ class DeliveryCartNotifier extends Notifier<DeliveryCartState> {
       state = state.copyWith(
         items: [
           ...state.items,
-          DeliveryCartItem(product: product, unitCost: product.averageCost),
+          DeliveryCartItem(
+            product: product, 
+            unitCost: product.averageCost,
+            unitSellingPrice: product.averageSellingPrice ?? 0.0,
+          ),
         ],
       );
     }
   }
 
-  Future<bool> addProductByBarcode(String barcode) async {
-    final db = ref.read(databaseProvider);
-    final product = await (db.select(db.products)..where((p) => p.barcode.equals(barcode))).getSingleOrNull();
-    
-    if (product != null) {
-      addProduct(product);
-      return true;
-    }
-    return false;
+  void updateUnitSellingPrice(String productId, double price) {
+    state = state.copyWith(
+      items: state.items.map((item) {
+        if (item.product.id == productId) {
+          return item.copyWith(unitSellingPrice: price);
+        }
+        return item;
+      }).toList(),
+    );
   }
 
   void updateQuantity(String productId, double quantity) {
@@ -173,6 +181,7 @@ class DeliveryCartNotifier extends Notifier<DeliveryCartState> {
           await (db.update(db.products)..where((p) => p.id.equals(item.product.id)))
             .write(ProductsCompanion(
               averageCost: drift.Value(item.unitCost),
+              averageSellingPrice: drift.Value(item.unitSellingPrice),
               currentStock: drift.Value(currentProduct.currentStock + item.quantity),
               updatedAt: drift.Value(now),
             ));
