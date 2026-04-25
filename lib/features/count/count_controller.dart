@@ -32,20 +32,39 @@ class CountItemEntry {
   double get variance => expectedQuantity - actualQuantity;
 }
 
+// FIXED: Using Notifier instead of StateProvider for Riverpod 3.x compatibility
+class ShowAllCountItemsNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  
+  void toggle(bool val) => state = val;
+}
+
+final showAllCountItemsProvider = NotifierProvider<ShowAllCountItemsNotifier, bool>(ShowAllCountItemsNotifier.new);
+
 class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
   @override
   Future<List<CountItemEntry>> build() async {
     final db = ref.read(databaseProvider);
+    final showAll = ref.watch(showAllCountItemsProvider);
     
-    // 1. Fetch active products
-    final products = await (db.select(db.products)
-      ..where((p) => p.isActive.equals(true))
-      ..orderBy([(p) => drift.OrderingTerm(expression: p.category)]))
-    .get();
-
-    // 2. Fetch existing drafts
+    // Fetch existing drafts
     final drafts = await db.select(db.countDrafts).get();
     final draftMap = {for (var d in drafts) d.productId: d.actualQuantity};
+    final draftedProductIds = draftMap.keys.toList();
+
+    // Fetch products
+    final query = db.select(db.products);
+    
+    // Combine filters: Must be active AND (Stock > 0 OR have a draft)
+    query.where((p) {
+      final active = p.isActive.equals(true);
+      if (showAll) return active;
+      return active & (p.currentStock.isBiggerThanValue(0) | p.id.isIn(draftedProductIds));
+    });
+    
+    query.orderBy([(p) => drift.OrderingTerm(expression: p.category)]);
+    final products = await query.get();
 
     return products.map((p) => CountItemEntry(
       product: p,
@@ -57,7 +76,6 @@ class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
   Future<void> updateQuantity(String productId, double actual) async {
     final currentItems = state.value ?? [];
     
-    // Update local state
     state = AsyncData(currentItems.map((item) {
       if (item.product.id == productId) {
         return item.copyWith(actualQuantity: actual);
@@ -65,7 +83,6 @@ class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
       return item;
     }).toList());
 
-    // Persist draft to DB (debounced or immediate, immediate for reliability here)
     final db = ref.read(databaseProvider);
     await db.into(db.countDrafts).insertOnConflictUpdate(
       CountDraftsCompanion.insert(
@@ -85,9 +102,7 @@ class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
     final now = DateTime.now();
 
     try {
-      // Use Batch for 10x performance improvement
       await db.transaction(() async {
-        // 1. Create the session
         await db.into(db.countSessions).insert(
           CountSessionsCompanion.insert(
             id: sessionId,
@@ -99,7 +114,6 @@ class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
 
         await db.batch((batch) {
           for (final item in items) {
-            // 2. Save items
             batch.insert(
               db.countItems,
               CountItemsCompanion.insert(
@@ -113,7 +127,6 @@ class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
               ),
             );
 
-            // 3. Update Product Baseline
             batch.update(
               db.products,
               ProductsCompanion(
@@ -125,7 +138,6 @@ class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
               where: (p) => p.id.equals(item.product.id),
             );
 
-            // 4. Log Discrepancy if exists
             if (item.variance != 0) {
               batch.insert(
                 db.auditLog,
@@ -146,11 +158,9 @@ class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
           }
         });
 
-        // 5. Clear all drafts on success
         await db.delete(db.countDrafts).go();
       });
 
-      // 6. Recalculate Burn Rates (Optimized: only if variance exists)
       final engine = BurnRateEngine(db);
       for (final item in items) {
         if (item.variance != 0) {
@@ -172,7 +182,6 @@ class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
   }
 }
 
-// Grouped products provider for the UI
 final groupedCountItemsProvider = Provider<AsyncValue<Map<String, List<CountItemEntry>>>>((ref) {
   final asyncItems = ref.watch(countSessionNotifierProvider);
   
