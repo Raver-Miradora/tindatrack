@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/logic/security.dart';
+import '../../core/providers.dart';
+import '../../core/logic/haptics.dart';
 
-class AuthScreen extends StatefulWidget {
+class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  State<AuthScreen> createState() => _AuthScreenState();
+  ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends ConsumerState<AuthScreen> {
   String _pin = '';
   String? _savedPin;
   bool _isLoading = true;
@@ -51,16 +55,21 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submitPin() async {
+    TindaHaptics.medium();
     final prefs = await SharedPreferences.getInstance();
     if (_savedPin == null) {
-      // Setup mode: save that exact pin
-      await prefs.setString('owner_pin', _pin);
+      // Setup mode: Hash and save
+      final hashed = TindaSecurity.hashPin(_pin);
+      await prefs.setString('owner_pin', hashed);
+      ref.read(authProvider.notifier).setAuthenticated(true);
       if (mounted) context.go('/');
     } else {
       // Login mode
-      if (_pin == _savedPin) {
+      if (TindaSecurity.verifyPin(_pin, _savedPin!)) {
+        ref.read(authProvider.notifier).setAuthenticated(true);
         if (mounted) context.go('/');
       } else {
+        TindaHaptics.warning();
         setState(() {
           _errorMsg = 'Incorrect PIN';
           _pin = '';
