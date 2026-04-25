@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'count_controller.dart';
 import '../../core/database/database.dart';
+import '../../core/logic/haptics.dart';
 
 class CountListScreen extends ConsumerWidget {
   const CountListScreen({super.key});
@@ -12,14 +13,15 @@ class CountListScreen extends ConsumerWidget {
     final pastSessionsAsync = ref.watch(pastSessionsProvider);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFFBFBFB),
       appBar: AppBar(
-        title: const Text('Inventory Counts'),
+        title: const Text('Count History', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: pastSessionsAsync.when(
         data: (sessions) => sessions.isEmpty 
           ? _buildEmptyState(context)
           : ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               itemCount: sessions.length,
               itemBuilder: (context, index) {
                 final session = sessions[index];
@@ -31,8 +33,10 @@ class CountListScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showStartDialog(context, ref),
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
-        label: const Text('New Count'),
+        label: const Text('New Physical Count', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -42,46 +46,68 @@ class CountListScreen extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.fact_check_outlined, size: 80, color: Colors.grey.shade300),
+          Icon(Icons.fact_check_outlined, size: 80, color: Colors.grey.shade200),
           const SizedBox(height: 16),
-          const Text('No count history found', style: TextStyle(color: Colors.grey, fontSize: 18)),
+          const Text('No count history found', style: TextStyle(color: Colors.grey, fontSize: 18, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          const Text('Perform your first physical count today!', style: TextStyle(color: Colors.grey)),
+          const Text('Track physical stock to prevent loss', style: TextStyle(color: Colors.grey)),
         ],
       ),
     );
   }
 
   Widget _buildSessionCard(BuildContext context, CountSession session) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
+      ),
       child: ListTile(
-        title: Text('Count: ${session.countType.toUpperCase()}'),
-        subtitle: Text('Completed: ${session.completedAt.toString().split('.')[0]}'),
-        trailing: const Icon(Icons.chevron_right),
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
+          child: const Icon(Icons.inventory_2_outlined, color: Colors.blue, size: 20),
+        ),
+        title: Text('Full Reconciliation', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        subtitle: Text('Completed ${_formatDate(session.completedAt)}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
         onTap: () {
-          // TODO: View session details
+          TindaHaptics.selection();
+          // Navigate to audit log filtered by counts for this period
+          context.push('/audit-log');
         },
       ),
     );
   }
 
+  String _formatDate(DateTime? dt) {
+    if (dt == null) return 'Unknown';
+    return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
   void _showStartDialog(BuildContext context, WidgetRef ref) {
+    TindaHaptics.selection();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Start Physical Count'),
-        content: const Text('Would you like to start a full inventory count? This will fetch all active products.'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Start Physical Count', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('This will generate a list of all products currently in stock. You can then enter the actual numbers found on your shelves.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
+              TindaHaptics.success();
               Navigator.pop(context);
-              // In the new AsyncNotifier, the build() method handles the initialization.
-              // We just need to navigate to the session screen.
-              context.push('/physical-count/session');
+              // FIXED: Navigate to correct route from router.dart
+              context.push('/physical-count/new');
             },
-            child: const Text('Start Full Count'),
+            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            child: const Text('Start Count'),
           ),
         ],
       ),
