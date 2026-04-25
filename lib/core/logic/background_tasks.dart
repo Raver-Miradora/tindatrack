@@ -1,4 +1,6 @@
 import 'package:workmanager/workmanager.dart';
+import 'package:uuid/uuid.dart';
+import 'package:drift/drift.dart' as drift;
 import '../database/database.dart';
 import 'burn_rate_engine.dart';
 
@@ -13,6 +15,19 @@ void callbackDispatcher() {
       
       try {
         await engine.updateAll();
+        
+        // Log background success heartbeat
+        await db.into(db.auditLog).insert(
+          AuditLogCompanion.insert(
+            id: const Uuid().v4(),
+            actionType: 'System Heartbeat',
+            targetType: 'background_task',
+            targetId: 'burn_rate_engine',
+            afterSnapshot: const drift.Value('{"status": "success"}'),
+            timestamp: drift.Value(DateTime.now()),
+          ),
+        );
+
         return Future.value(true);
       } catch (e) {
         return Future.value(false);
