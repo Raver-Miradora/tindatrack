@@ -19,6 +19,7 @@ class _NewCountScreenState extends ConsumerState<NewCountScreen> {
   @override
   Widget build(BuildContext context) {
     final groupedItemsAsync = ref.watch(groupedCountItemsProvider);
+    final showAll = ref.watch(showAllCountItemsProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBFBFB),
@@ -42,7 +43,7 @@ class _NewCountScreenState extends ConsumerState<NewCountScreen> {
       ),
       body: Column(
         children: [
-          _buildSearchAndFilters(),
+          _buildSearchAndFilters(showAll),
           Expanded(
             child: AsyncValueWidget(
               value: groupedItemsAsync,
@@ -68,7 +69,7 @@ class _NewCountScreenState extends ConsumerState<NewCountScreen> {
     );
   }
 
-  Widget _buildSearchAndFilters() {
+  Widget _buildSearchAndFilters(bool showAll) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -93,7 +94,7 @@ class _NewCountScreenState extends ConsumerState<NewCountScreen> {
           Row(
             children: [
               FilterChip(
-                label: const Text('Show Only Discrepancies', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                label: const Text('Discrepancies', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 selected: _showOnlyDiscrepancies,
                 onSelected: (val) {
                   TindaHaptics.selection();
@@ -102,6 +103,19 @@ class _NewCountScreenState extends ConsumerState<NewCountScreen> {
                 selectedColor: Colors.red.shade50,
                 checkmarkColor: Colors.red,
                 side: BorderSide(color: _showOnlyDiscrepancies ? Colors.red.shade200 : Colors.grey.shade300),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              const SizedBox(width: 8),
+              FilterChip(
+                label: const Text('Show Out of Stock', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                selected: showAll,
+                onSelected: (val) {
+                  TindaHaptics.selection();
+                  ref.read(showAllCountItemsProvider.notifier).toggle(val);
+                },
+                selectedColor: Colors.blue.shade50,
+                checkmarkColor: Colors.blue,
+                side: BorderSide(color: showAll ? Colors.blue.shade200 : Colors.grey.shade300),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ],
@@ -213,6 +227,7 @@ class _NewCountScreenState extends ConsumerState<NewCountScreen> {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.grey.shade100,
+                hintText: item.actualQuantity.toInt().toString(),
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
