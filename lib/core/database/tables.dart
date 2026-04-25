@@ -12,7 +12,7 @@ class Products extends Table {
   RealColumn get averageSellingPrice => real().nullable()();
   RealColumn get burnRatePerDay => real().withDefault(const Constant(0.0))();
   RealColumn get lastActualQuantity => real().withDefault(const Constant(0.0))();
-  RealColumn get currentStock => real().withDefault(const Constant(0.0))(); // Real-time estimated stock
+  RealColumn get currentStock => real().withDefault(const Constant(0.0))(); 
   DateTimeColumn get lastCountedAt => dateTime().nullable()();
   DateTimeColumn get lastBurnRateUpdate => dateTime().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
@@ -99,7 +99,7 @@ class Users extends Table {
   TextColumn get id => text()();
   TextColumn get displayName => text()();
   TextColumn get role => text()();
-  TextColumn get pin => text()();
+  TextColumn get pin => text()(); // Will be hashed via Crypto utility
   TextColumn get email => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
