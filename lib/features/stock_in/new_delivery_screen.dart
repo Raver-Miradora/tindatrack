@@ -160,8 +160,18 @@ class NewDeliveryScreen extends ConsumerWidget {
       MaterialPageRoute(builder: (context) => const ScannerView()),
     );
     if (result != null) {
-      final found = await ref.read(deliveryCartProvider.notifier).addProductByBarcode(result);
-      if (!found && context.mounted) {
+      final db = ref.read(databaseProvider);
+      final product = await (db.select(db.products)..where((p) => p.barcode.equals(result))).getSingleOrNull();
+      
+      if (product != null) {
+        ref.read(deliveryCartProvider.notifier).addProduct(product);
+        
+        // Always auto-open the edit dialog for recognized items to confirm Qty and Price
+        if (context.mounted) {
+          final item = ref.read(deliveryCartProvider).items.firstWhere((i) => i.product.id == product.id);
+          _editItem(context, ref, item);
+        }
+      } else if (context.mounted) {
         TindaHaptics.warning();
         _promptCreateProduct(context, ref, result);
       }
@@ -214,9 +224,10 @@ class NewDeliveryScreen extends ConsumerWidget {
       context: context,
       builder: (context) => ItemEditDialog(
         item: item,
-        onConfirm: (qty, cost) {
+        onConfirm: (qty, cost, price) {
           ref.read(deliveryCartProvider.notifier).updateQuantity(item.product.id, qty);
           ref.read(deliveryCartProvider.notifier).updateUnitCost(item.product.id, cost);
+          ref.read(deliveryCartProvider.notifier).updateUnitSellingPrice(item.product.id, price);
         },
         onRemove: () {
           ref.read(deliveryCartProvider.notifier).removeItem(item.product.id);
