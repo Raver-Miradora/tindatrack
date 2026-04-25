@@ -4,12 +4,14 @@ import '../../core/database/database.dart';
 import '../../core/providers.dart';
 import 'package:drift/drift.dart';
 
-final activeAlertsProvider = StreamProvider<List<Alert>>((ref) {
+// HARDENING: Added .autoDispose to all providers to ensure memory is freed when screens are closed
+
+final activeAlertsProvider = StreamProvider.autoDispose<List<Alert>>((ref) {
   final db = ref.watch(databaseProvider);
   return (db.select(db.alerts)..where((a) => a.status.equals('open'))).watch();
 });
 
-final recentActivityProvider = StreamProvider<List<AuditLogData>>((ref) {
+final recentActivityProvider = StreamProvider.autoDispose<List<AuditLogData>>((ref) {
   final db = ref.watch(databaseProvider);
   return (db.select(db.auditLog)
         ..orderBy([(u) => OrderingTerm(expression: u.timestamp, mode: OrderingMode.desc)])
@@ -17,16 +19,22 @@ final recentActivityProvider = StreamProvider<List<AuditLogData>>((ref) {
       .watch();
 });
 
-final productsProvider = StreamProvider<List<Product>>((ref) {
+final productsProvider = StreamProvider.autoDispose<List<Product>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.select(db.products).watch();
 });
 
-final lowStockItemsProvider = StreamProvider<List<Product>>((ref) {
+final lowStockItemsProvider = StreamProvider.autoDispose<List<Product>>((ref) {
   final db = ref.watch(databaseProvider);
-  return (db.select(db.products)
-    ..where((p) => p.isActive.equals(true) & (p.currentStock.isSmallerOrEqual(p.reorderPoint))))
-  .watch();
+  return (db.select(db.products)..where((p) {
+    // Only alert if the product has been explicitly "handled" (stocked in or counted)
+    final stockInItems = db.selectOnly(db.stockInItems)..addColumns([db.stockInItems.productId]);
+    final countItems = db.selectOnly(db.countItems)..addColumns([db.countItems.productId]);
+    
+    return p.isActive.equals(true) & 
+           (p.currentStock.isSmallerOrEqual(p.reorderPoint)) & 
+           (p.id.isInQuery(stockInItems) | p.id.isInQuery(countItems));
+  })).watch();
 });
 
 class DashboardStatus {
@@ -45,7 +53,7 @@ class DashboardStatus {
   });
 }
 
-final dashboardStatusProvider = Provider<AsyncValue<DashboardStatus>>((ref) {
+final dashboardStatusProvider = Provider.autoDispose<AsyncValue<DashboardStatus>>((ref) {
   final alertsAsync = ref.watch(activeAlertsProvider);
   final lowStockAsync = ref.watch(lowStockItemsProvider);
 
@@ -99,7 +107,7 @@ class PredictedProduct {
   });
 }
 
-final predictiveProductsProvider = Provider<List<PredictedProduct>>((ref) {
+final predictiveProductsProvider = Provider.autoDispose<List<PredictedProduct>>((ref) {
   final productsAsync = ref.watch(productsProvider);
   
   return productsAsync.when(
