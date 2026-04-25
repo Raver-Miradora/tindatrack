@@ -11,6 +11,10 @@ class TindaHaptics {
     await HapticFeedback.mediumImpact();
   }
 
+  static Future<void> medium() async {
+    await HapticFeedback.mediumImpact();
+  }
+
   /// Heavy impact or double-tap for warnings or errors.
   static Future<void> warning() async {
     await HapticFeedback.heavyImpact();
