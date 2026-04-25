@@ -1,73 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'settings_controller.dart';
 import '../../core/providers.dart';
 import '../../core/logic/haptics.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  late TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    final currentName = ref.read(storeNameProvider);
+    _nameController = TextEditingController(text: currentName);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: const Color(0xFFFBFBFB),
       appBar: AppBar(
-        title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Settings & Profile', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         children: [
-          _buildSettingsGroup(
-            'Store Identity',
-            [
-              const ListTile(
-                leading: Icon(Icons.storefront_outlined),
-                title: Text('Store Name'),
-                subtitle: Text('TindaTrack Demo Store'),
-              ),
-              const ListTile(
-                leading: Icon(Icons.person_outline),
-                title: Text('Owner Profile'),
-                subtitle: Text('Default Admin'),
-              ),
-            ],
+          _buildBrandingSection(),
+          const SizedBox(height: 32),
+          const Text('Inventory Management', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 16),
+          _buildActionCard(
+            context,
+            icon: Icons.delete_forever_rounded,
+            color: Colors.red,
+            title: 'Wipe All Data',
+            subtitle: 'Delete all products, stock history, and logs',
+            onTap: () => _confirmWipe(context, ref),
           ),
-          const SizedBox(height: 24),
-          _buildSettingsGroup(
-            'Security',
-            [
-              ListTile(
-                leading: const Icon(Icons.lock_outline),
-                title: const Text('Change Access PIN'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  TindaHaptics.selection();
-                  // Implementation handled in original screen
-                },
-              ),
-            ],
+          const SizedBox(height: 12),
+          _buildActionCard(
+            context,
+            icon: Icons.backup_rounded,
+            color: Colors.blue,
+            title: 'Export Data',
+            subtitle: 'Generate a CSV report of current stock',
+            onTap: () {
+              TindaHaptics.light();
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Exporting CSV... (Future Feature)')));
+            },
           ),
-          const SizedBox(height: 24),
-          _buildSettingsGroup(
-            'Maintenance',
-            [
-              ListTile(
-                leading: const Icon(Icons.delete_forever, color: Colors.red),
-                title: const Text('Wipe All Data', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                subtitle: const Text('Reset inventory, sales history, and logs'),
-                onTap: () => _confirmWipeData(context, ref),
-              ),
-            ],
-          ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 40),
           const Center(
-            child: Column(
-              children: [
-                Text('TindaTrack', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.5)),
-                Text('Production Release Candidate 1', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                SizedBox(height: 8),
-                Text('Made with ❤️ for Sari-Sari Stores', style: TextStyle(color: Colors.grey, fontSize: 10)),
-              ],
+            child: Text('TindaTrack v1.0.0-RC\nDesigned for Sari-Sari Success', 
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 12, height: 1.5),
             ),
           ),
         ],
@@ -75,79 +73,108 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSettingsGroup(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 8, bottom: 12),
-          child: Text(title.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black54, fontSize: 11, letterSpacing: 1.2)),
-        ),
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.shade200)),
-          child: Column(children: children),
-        ),
-      ],
+  Widget _buildBrandingSection() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Store Branding', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 4),
+          const Text('This name appears on your dashboard and reports', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              labelText: 'Store Name',
+              hintText: 'Enter your store name',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              prefixIcon: const Icon(Icons.storefront_rounded),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                TindaHaptics.success();
+                await ref.read(storeNameProvider.notifier).updateName(_nameController.text);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Branding updated!')));
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  void _confirmWipeData(BuildContext context, WidgetRef ref) {
+  Widget _buildActionCard(BuildContext context, {required IconData icon, required Color color, required String title, required String subtitle, required VoidCallback onTap}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  void _confirmWipe(BuildContext context, WidgetRef ref) {
     TindaHaptics.warning();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Wipe All Data?'),
-        content: const Text('This will permanently delete all products, deliveries, and counts. This action CANNOT be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => _finalConfirmation(context, ref),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('Delete Everything'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _finalConfirmation(BuildContext context, WidgetRef ref) {
-    TindaHaptics.warning();
-    Navigator.pop(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Final Warning'),
-        content: const Text('Are you absolutely sure? Typing "WIPE" is required for safety in a real release, but for now, click confirm to reset.'),
+        content: const Text('This action is permanent. You will lose all inventory counts, delivery history, and custom products. Your store name will also reset.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
-              await _executeWipe(context, ref);
+              TindaHaptics.success();
+              final db = ref.read(databaseProvider);
+              await db.transaction(() async {
+                await db.delete(db.stockInItems).go();
+                await db.delete(db.stockInEvents).go();
+                await db.delete(db.countItems).go();
+                await db.delete(db.countSessions).go();
+                await db.delete(db.auditLog).go();
+                await db.delete(db.products).go();
+              });
+              await ref.read(storeNameProvider.notifier).updateName('TindaTrack');
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All data wiped successfully.')));
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('CONFIRM RESET'),
+            child: const Text('Yes, Wipe Everything'),
           ),
         ],
       ),
     );
-  }
-
-  Future<void> _executeWipe(BuildContext context, WidgetRef ref) async {
-    TindaHaptics.success();
-    final db = ref.read(databaseProvider);
-    
-    // In a real drift setup, we can drop and recreate or delete from all tables
-    await db.transaction(() async {
-      for (final table in db.allTables) {
-        await db.delete(table).go();
-      }
-    });
-
-    if (context.mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Store data has been completely reset.')));
-      context.go('/auth');
-    }
   }
 }
