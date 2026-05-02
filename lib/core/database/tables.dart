@@ -16,6 +16,7 @@ class Products extends Table {
   DateTimeColumn get lastCountedAt => dateTime().nullable()();
   DateTimeColumn get lastBurnRateUpdate => dateTime().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  BoolColumn get isSeeded => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
@@ -131,4 +132,59 @@ class CountDrafts extends Table {
 
   @override
   Set<Column> get primaryKey => {productId};
+}
+
+// SalesTransactions Table (v2)
+class SalesTransactions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  DateTimeColumn get timestamp => dateTime().withDefault(currentDateAndTime)();
+  RealColumn get totalAmount => real()();
+  TextColumn get itemsSnapshot => text()();
+  TextColumn get paymentMethod => text().withDefault(const Constant('CASH'))();
+  IntColumn get shiftId => integer().nullable()();
+}
+
+// Customers Table (v4)
+class Customers extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// UtangLedger Table (v4)
+class UtangLedger extends Table {
+  TextColumn get id => text()();
+  TextColumn get customerId => text().references(Customers, #id)();
+  RealColumn get amount => real()();
+  DateTimeColumn get timestamp => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get description => text().nullable()();
+  IntColumn get shiftId => integer().nullable()();
+  TextColumn get itemsSnapshot => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// StoreExpenses Table (v5)
+class StoreExpenses extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  RealColumn get amount => real()();
+  TextColumn get description => text()();
+  DateTimeColumn get timestamp => dateTime().withDefault(currentDateAndTime)();
+  IntColumn get shiftId => integer().nullable()();
+}
+
+// CashierShifts Table (v6)
+class CashierShifts extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get cashierName => text()();
+  DateTimeColumn get startTime => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get endTime => dateTime().nullable()();
+  RealColumn get openingFloat => real()();
+  RealColumn get expectedClosingFloat => real().nullable()();
+  RealColumn get actualClosingFloat => real().nullable()();
+  RealColumn get variance => real().nullable()();
 }
