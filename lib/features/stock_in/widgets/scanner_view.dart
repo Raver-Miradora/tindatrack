@@ -9,14 +9,54 @@ class ScannerView extends StatefulWidget {
 }
 
 class _ScannerViewState extends State<ScannerView> {
-  final MobileScannerController _controller = MobileScannerController();
-  bool _isDisposed = false;
+  // One fresh controller per route instance. Created in the State class (not in
+  // build()) so it is guaranteed to be a new, independent instance on every
+  // route push, with no shared state from a previous session.
+  final MobileScannerController _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+  );
+
+  // Atomic lock: set to true the moment a valid barcode is accepted.
+  // Prevents the 30fps frame stream from queuing multiple pop() calls.
+  bool _isLocked = false;
 
   @override
   void dispose() {
-    _isDisposed = true;
+    // dispose() runs on the Flutter UI thread AFTER the route pop animation
+    // completes and the widget is fully removed from the tree. This is the
+    // safe, non-deadlocking teardown path for the native camera resources.
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onBarcodeDetected(BarcodeCapture capture) {
+    // Guard 1: if we've already accepted a barcode, ignore all further frames.
+    if (_isLocked) return;
+
+    final List<Barcode> barcodes = capture.barcodes;
+    if (barcodes.isEmpty) return;
+
+    final String? code = barcodes.first.rawValue;
+    if (code == null) return;
+
+    // Guard 2: check mounted BEFORE setting _isLocked.
+    // 
+    // Critical ordering: if we set _isLocked = true first and then discover
+    // mounted == false, the lock is permanently engaged. The user would
+    // re-open the scanner, scan an item, and nothing would happen — a "ghost
+    // scanner" that appears active but is silently bricked.
+    //
+    // By checking mounted first, we guarantee _isLocked is only committed when
+    // we know the pop() will actually execute.
+    if (!mounted) return;
+
+    _isLocked = true;
+    Navigator.pop(context, code);
+
+    // NOTE: Do NOT call _controller.stop() here.
+    // stop() tries to join the native Android HandlerThread, but onDetect
+    // is invoked FROM that thread. Calling stop() here is a self-deadlock.
+    // The camera is released safely via dispose() above.
   }
 
   @override
@@ -30,25 +70,15 @@ class _ScannerViewState extends State<ScannerView> {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Scan Product Barcode', style: TextStyle(color: Colors.white)),
+        title: const Text('Scan Product Barcode',
+            style: TextStyle(color: Colors.white)),
       ),
       body: Stack(
         children: [
           MobileScanner(
             controller: _controller,
-            onDetect: (capture) {
-              final List<Barcode> barcodes = capture.barcodes;
-              if (barcodes.isNotEmpty && !_isDisposed) {
-                final String? code = barcodes.first.rawValue;
-                if (code != null) {
-                  _isDisposed = true; // Prevent double pop
-                  Navigator.pop(context, code);
-                }
-              }
-            },
+            onDetect: _onBarcodeDetected,
           ),
-          // Scanner Overlay Mask
-          _buildScannerOverlay(context),
           _buildControls(),
         ],
       ),
@@ -76,7 +106,8 @@ class _ScannerViewState extends State<ScannerView> {
     );
   }
 
-  Widget _buildControlButton({required IconData icon, required VoidCallback onTap}) {
+  Widget _buildControlButton(
+      {required IconData icon, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -87,107 +118,6 @@ class _ScannerViewState extends State<ScannerView> {
         ),
         child: Icon(icon, color: Colors.white, size: 28),
       ),
-    );
-  }
-
-  Widget _buildScannerOverlay(BuildContext context) {
-    return Container(
-      decoration: ShapeDecoration(
-        shape: CustomOverlayShape(
-          borderColor: Theme.of(context).primaryColor,
-          borderRadius: 10,
-          borderLength: 30,
-          borderWidth: 8,
-          cutOutSize: 250,
-        ),
-      ),
-    );
-  }
-}
-
-class CustomOverlayShape extends ShapeBorder {
-  final Color borderColor;
-  final double borderWidth;
-  final double borderRadius;
-  final double borderLength;
-  final double cutOutSize;
-
-  const CustomOverlayShape({
-    this.borderColor = Colors.white,
-    this.borderWidth = 10,
-    this.borderRadius = 0,
-    this.borderLength = 40,
-    this.cutOutSize = 250,
-  });
-
-  @override
-  EdgeInsetsGeometry get dimensions => EdgeInsets.zero;
-
-  @override
-  Path getInnerPath(Rect rect, {TextDirection? textDirection}) => Path();
-
-  @override
-  Path getOuterPath(Rect rect, {TextDirection? textDirection}) => Path()..addRect(rect);
-
-  @override
-  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
-    final width = rect.width;
-    final height = rect.height;
-    final cutOutRect = Rect.fromCenter(
-      center: Offset(width / 2, height / 2),
-      width: cutOutSize,
-      height: cutOutSize,
-    );
-
-    final backgroundPaint = Paint()..color = Colors.black54;
-    final borderPaint = Paint()
-      ..color = borderColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = borderWidth;
-
-    // Draw background with cutout
-    canvas.drawPath(
-      Path.combine(
-        PathOperation.difference,
-        Path()..addRect(rect),
-        Path()..addRRect(RRect.fromRectAndRadius(cutOutRect, Radius.circular(borderRadius))),
-      ),
-      backgroundPaint,
-    );
-
-    // Draw borders
-    final borderPath = Path();
-    // Top Left
-    borderPath.moveTo(cutOutRect.left, cutOutRect.top + borderLength);
-    borderPath.lineTo(cutOutRect.left, cutOutRect.top);
-    borderPath.lineTo(cutOutRect.left + borderLength, cutOutRect.top);
-
-    // Top Right
-    borderPath.moveTo(cutOutRect.right - borderLength, cutOutRect.top);
-    borderPath.lineTo(cutOutRect.right, cutOutRect.top);
-    borderPath.lineTo(cutOutRect.right, cutOutRect.top + borderLength);
-
-    // Bottom Right
-    borderPath.moveTo(cutOutRect.right, cutOutRect.bottom - borderLength);
-    borderPath.lineTo(cutOutRect.right, cutOutRect.bottom);
-    borderPath.lineTo(cutOutRect.right - borderLength, cutOutRect.bottom);
-
-    // Bottom Left
-    borderPath.moveTo(cutOutRect.left + borderLength, cutOutRect.bottom);
-    borderPath.lineTo(cutOutRect.left, cutOutRect.bottom);
-    borderPath.lineTo(cutOutRect.left, cutOutRect.bottom - borderLength);
-
-    canvas.drawPath(borderPath, borderPaint);
-  }
-
-  @override
-  ShapeBorder scale(double t) {
-    return CustomOverlayShape(
-      borderColor: borderColor,
-      borderWidth: borderWidth,
-      borderRadius: borderRadius,
-      borderLength: borderLength,
-      cutOutSize: cutOutSize,
     );
   }
 }
