@@ -7,7 +7,8 @@ import '../../core/widgets/async_value_widget.dart';
 import '../dashboard/dashboard_providers.dart';
 
 class ProductListScreen extends ConsumerStatefulWidget {
-  const ProductListScreen({super.key});
+  final bool initialShowLowStock;
+  const ProductListScreen({super.key, this.initialShowLowStock = false});
 
   @override
   ConsumerState<ProductListScreen> createState() => _ProductListScreenState();
@@ -16,6 +17,16 @@ class ProductListScreen extends ConsumerStatefulWidget {
 class _ProductListScreenState extends ConsumerState<ProductListScreen> {
   String _searchQuery = '';
   bool _showOnlyInStock = true;
+  bool _showOnlyLowStock = false;
+  bool _showNewOnly = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _showOnlyLowStock = widget.initialShowLowStock;
+    // Removed override: keep 'In-Store Only' true when 'Low Stock' is true 
+    // to filter out seeded items that have 0 stock and have never been stocked.
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +63,22 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                       selected: _showOnlyInStock,
                       onSelected: (val) => setState(() => _showOnlyInStock = val),
                     ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Low Stock', style: TextStyle(fontSize: 12)),
+                      selected: _showOnlyLowStock,
+                      selectedColor: Colors.orange.shade100,
+                      checkmarkColor: Colors.orange.shade900,
+                      onSelected: (val) => setState(() => _showOnlyLowStock = val),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Bagong Paninda', style: TextStyle(fontSize: 12)),
+                      selected: _showNewOnly,
+                      selectedColor: Colors.purple.shade100,
+                      checkmarkColor: Colors.purple.shade900,
+                      onSelected: (val) => setState(() => _showNewOnly = val),
+                    ),
                   ],
                 ),
               ),
@@ -65,8 +92,14 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
           final filtered = products.where((p) {
             final matchesQuery = p.name.toLowerCase().contains(_searchQuery.toLowerCase()) || 
                                p.barcode?.contains(_searchQuery) == true;
+                               
+            if (_showNewOnly) {
+              return matchesQuery && !p.isSeeded;
+            }
+            
             final matchesStock = !_showOnlyInStock || p.currentStock > 0;
-            return matchesQuery && matchesStock;
+            final matchesLowStock = !_showOnlyLowStock || p.currentStock <= p.reorderPoint;
+            return matchesQuery && matchesStock && matchesLowStock;
           }).toList();
 
           if (filtered.isEmpty) {
