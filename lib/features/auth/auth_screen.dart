@@ -15,9 +15,11 @@ class AuthScreen extends ConsumerStatefulWidget {
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   String _pin = '';
+  String _confirmPin = '';
   String? _savedPin;
   bool _isLoading = true;
   String _errorMsg = '';
+  bool _isConfirming = false;
 
   @override
   void initState() {
@@ -34,66 +36,79 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   void _onKeypadTap(String value) {
-    if (_pin.length < 4) {
-      setState(() {
-        _pin += value;
-        _errorMsg = '';
-      });
-      if (_pin.length == 4) {
-        _submitPin();
+    if (_isConfirming) {
+      if (_confirmPin.length < 4) {
+        setState(() {
+          _confirmPin += value;
+          _errorMsg = '';
+        });
+        if (_confirmPin.length == 4) {
+          _submitSetup();
+        }
+      }
+    } else {
+      if (_pin.length < 4) {
+        setState(() {
+          _pin += value;
+          _errorMsg = '';
+        });
+        if (_pin.length == 4) {
+          if (_savedPin == null) {
+            setState(() {
+              _isConfirming = true;
+              _errorMsg = '';
+            });
+          } else {
+            _submitLogin();
+          }
+        }
       }
     }
   }
 
   void _onDeleteTap() {
-    if (_pin.isNotEmpty) {
+    if (_isConfirming) {
+      if (_confirmPin.isNotEmpty) {
+        setState(() => _confirmPin = _confirmPin.substring(0, _confirmPin.length - 1));
+      } else {
+        setState(() => _isConfirming = false);
+      }
+    } else if (_pin.isNotEmpty) {
+      setState(() => _pin = _pin.substring(0, _pin.length - 1));
+    }
+  }
+
+  Future<void> _submitLogin() async {
+    TindaHaptics.medium();
+    if (TindaSecurity.verifyPin(_pin, _savedPin!)) {
+      ref.read(authProvider.notifier).setAuthenticated(true);
+      if (mounted) context.go('/');
+    } else {
+      TindaHaptics.warning();
       setState(() {
-        _pin = _pin.substring(0, _pin.length - 1);
-        _errorMsg = '';
+        _errorMsg = 'Incorrect PIN';
+        _pin = '';
       });
     }
   }
 
-  Future<void> _submitPin() async {
+  Future<void> _submitSetup() async {
     TindaHaptics.medium();
-    final prefs = await SharedPreferences.getInstance();
-    if (_savedPin == null) {
-      // Setup mode: Hash and save
+    if (_pin == _confirmPin) {
+      final prefs = await SharedPreferences.getInstance();
       final hashed = TindaSecurity.hashPin(_pin);
       await prefs.setString('owner_pin', hashed);
       ref.read(authProvider.notifier).setAuthenticated(true);
       if (mounted) context.go('/');
     } else {
-      // Login mode
-      if (TindaSecurity.verifyPin(_pin, _savedPin!)) {
-        ref.read(authProvider.notifier).setAuthenticated(true);
-        if (mounted) context.go('/');
-      } else {
-        TindaHaptics.warning();
-        setState(() {
-          _errorMsg = 'Incorrect PIN';
-          _pin = '';
-        });
-      }
+      TindaHaptics.warning();
+      setState(() {
+        _errorMsg = 'PINs do not match. Try again.';
+        _pin = '';
+        _confirmPin = '';
+        _isConfirming = false;
+      });
     }
-  }
-
-  Widget _buildNumpadButton(String text) {
-    return InkWell(
-      onTap: () => _onKeypadTap(text),
-      customBorder: const CircleBorder(),
-      child: Container(
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
   }
 
   @override
@@ -103,76 +118,111 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
 
     final isSetup = _savedPin == null;
+    final currentPin = _isConfirming ? _confirmPin : _pin;
+    final title = isSetup 
+        ? (_isConfirming ? 'Confirm your PIN' : 'Set up your Security PIN')
+        : 'Enter your PIN';
 
     return Scaffold(
+      backgroundColor: Colors.white,
+      // CRITICAL: Without resizeToAvoidBottomInset, the numpad clips off screen
+      // on any Android device with a soft keyboard active (e.g. external keyboard
+      // connected, or accessibility overlay). Setting true lets the Scaffold
+      // compress its body to fit above the keyboard inset.
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: [
             const Spacer(flex: 2),
-            const Icon(Icons.storefront, size: 80, color: Colors.green),
-            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.lock_person_outlined, size: 64, color: Colors.green),
+            ),
+            const SizedBox(height: 24),
             Text(
-              'TindaTrack',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+              'TindaTrack Security',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
                   ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 12),
             Text(
-              isSetup ? 'Create your 4-digit PIN' : 'Enter your PIN',
-              style: Theme.of(context).textTheme.titleLarge,
+              title,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(4, (index) {
                 return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 12),
-                  width: 20,
-                  height: 20,
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  width: 16,
+                  height: 16,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: index < _pin.length
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey.shade300,
+                    color: index < currentPin.length
+                        ? Colors.green
+                        : Colors.grey.shade200,
                   ),
                 );
               }),
             ),
-            if (_errorMsg.isNotEmpty) ...[
-              const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            if (_errorMsg.isNotEmpty)
               Text(
                 _errorMsg,
-                style: const TextStyle(color: Colors.red, fontSize: 16),
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
               ),
-            ],
             const Spacer(),
-            Expanded(
-              flex: 4,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: GridView.count(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 20,
-                  crossAxisSpacing: 20,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    for (var i = 1; i <= 9; i++) _buildNumpadButton(i.toString()),
-                    const SizedBox.shrink(), // empty space
-                    _buildNumpadButton('0'),
-                    InkWell(
-                      onTap: _onDeleteTap,
-                      customBorder: const CircleBorder(),
-                      child: const Center(
-                        child: Icon(Icons.backspace, size: 32, color: Colors.grey),
-                      ),
-                    ),
-                  ],
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              child: GridView.count(
+                shrinkWrap: true,
+                crossAxisCount: 3,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.2,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  for (var i = 1; i <= 9; i++) _buildNumpadButton(i.toString()),
+                  const SizedBox.shrink(),
+                  _buildNumpadButton('0'),
+                  _buildDeleteButton(),
+                ],
               ),
             ),
+            const SizedBox(height: 48),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildNumpadButton(String text) {
+    return InkWell(
+      onTap: () => _onKeypadTap(text),
+      borderRadius: BorderRadius.circular(50),
+      child: Container(
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeleteButton() {
+    return InkWell(
+      onTap: _onDeleteTap,
+      borderRadius: BorderRadius.circular(50),
+      child: const Center(
+        child: Icon(Icons.backspace_outlined, size: 28, color: Colors.grey),
       ),
     );
   }
