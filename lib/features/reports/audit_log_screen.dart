@@ -160,11 +160,17 @@ class _AuditLogTile extends StatelessWidget {
   void _showLogDetails(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true, // Fix 1: Allows scrolling if content exceeds screen height
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 24,
+          right: 24,
+          top: 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,7 +181,8 @@ class _AuditLogTile extends StatelessWidget {
             Text(DateFormat('EEEE, MMMM dd, yyyy - hh:mm a').format(log.timestamp),
                  style: const TextStyle(color: Colors.grey)),
             const Divider(height: 48),
-            _buildDetailRow('Reference ID', log.targetId.substring(0, 8).toUpperCase()),
+            // Fix 2: Safe substring to prevent RangeError crash on short IDs
+            _buildDetailRow('Reference ID', log.targetId.length > 8 ? log.targetId.substring(0, 8).toUpperCase() : log.targetId.toUpperCase()),
             _buildDetailRow('Category', log.targetType),
             if (log.afterSnapshot != null) ...[
               const SizedBox(height: 24),
