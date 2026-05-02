@@ -27,7 +27,7 @@ class _ItemEditDialogState extends State<ItemEditDialog> {
     super.initState();
     _qtyController = TextEditingController(text: widget.item.quantity.toInt().toString());
     _costController = TextEditingController(text: widget.item.unitCost.toStringAsFixed(2));
-    _priceController = TextEditingController(text: widget.item.unitSellingPrice.toStringAsFixed(2));
+    _priceController = TextEditingController(text: widget.item.unitSellingPrice.toInt().toString());
   }
 
   @override
@@ -74,10 +74,10 @@ class _ItemEditDialogState extends State<ItemEditDialog> {
             const SizedBox(height: 16),
             TextField(
               controller: _priceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Selling Price (PHP)',
-                helperText: 'Store price for customers',
+                helperText: 'Store price (Integer)',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.sell_outlined),
                 isDense: true,
@@ -95,7 +95,6 @@ class _ItemEditDialogState extends State<ItemEditDialog> {
           style: TextButton.styleFrom(foregroundColor: Colors.red),
           child: const Text('Remove'),
         ),
-        const Spacer(),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
@@ -104,7 +103,10 @@ class _ItemEditDialogState extends State<ItemEditDialog> {
           onPressed: () {
             final qty = double.tryParse(_qtyController.text) ?? widget.item.quantity;
             final cost = double.tryParse(_costController.text) ?? widget.item.unitCost;
-            final price = double.tryParse(_priceController.text) ?? widget.item.unitSellingPrice;
+            // Force selling price to be an integer
+            final priceRaw = double.tryParse(_priceController.text) ?? widget.item.unitSellingPrice;
+            final price = priceRaw.roundToDouble();
+            
             widget.onConfirm(qty, cost, price);
             Navigator.pop(context);
           },
