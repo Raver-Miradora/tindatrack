@@ -4,12 +4,16 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/stock_in/new_delivery_screen.dart';
 import '../features/count/count_list_screen.dart';
 import '../features/count/new_count_screen.dart';
-import '../features/reports/reports_screen.dart';
+
 import '../features/reports/audit_log_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/inventory/product_list_screen.dart';
 import '../features/inventory/product_create_screen.dart';
 import '../features/auth/auth_screen.dart';
+import '../features/pos/pos_scanner_screen.dart';
+import '../features/sales_history/daily_transactions_screen.dart';
+import '../features/sales_history/utang_list_screen.dart';
+import '../features/analytics/analytics_dashboard_screen.dart';
 import 'providers.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -22,9 +26,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       final pinSet = prefs.getString('owner_pin') != null;
       final loggingIn = state.matchedLocation == '/login';
 
+      // FORCE SETUP: If no PIN is set, must go to login (setup mode)
+      if (!pinSet && !loggingIn) {
+        return '/login';
+      }
+      
+      // GUARD: If PIN is set but not authenticated, must go to login
       if (pinSet && !isAuthenticated && !loggingIn) {
         return '/login';
       }
+
+      // REDIRECT: If authenticated and on login, go home
       if (isAuthenticated && loggingIn) {
         return '/';
       }
@@ -40,6 +52,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const DashboardScreen(),
       ),
       GoRoute(
+        path: '/pos',
+        builder: (context, state) => const PosScannerScreen(),
+      ),
+      GoRoute(
+        path: '/sales-history',
+        builder: (context, state) => const DailyTransactionsScreen(),
+      ),
+      GoRoute(
+        path: '/utang-list',
+        builder: (context, state) => const UtangListScreen(),
+      ),
+      GoRoute(
+        path: '/analytics',
+        builder: (context, state) => const AnalyticsDashboardScreen(),
+      ),
+      GoRoute(
         path: '/stock-in',
         builder: (context, state) => const NewDeliveryScreen(),
       ),
@@ -51,10 +79,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/physical-count/new',
         builder: (context, state) => const NewCountScreen(),
       ),
-      GoRoute(
-        path: '/reports',
-        builder: (context, state) => const ReportsScreen(),
-      ),
+
       GoRoute(
         path: '/audit-log',
         builder: (context, state) => const AuditLogScreen(),
@@ -65,7 +90,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/inventory',
-        builder: (context, state) => const ProductListScreen(),
+        builder: (context, state) {
+          final showLowStock = state.extra as bool? ?? false;
+          return ProductListScreen(initialShowLowStock: showLowStock);
+        },
       ),
       GoRoute(
         path: '/inventory/create',
