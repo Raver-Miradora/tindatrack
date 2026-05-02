@@ -45,6 +45,11 @@ final showAllCountItemsProvider = NotifierProvider<ShowAllCountItemsNotifier, bo
 class CountSessionNotifier extends AsyncNotifier<List<CountItemEntry>> {
   @override
   Future<List<CountItemEntry>> build() async {
+    // LIFECYCLE FIX: keepAlive prevents Riverpod from auto-disposing the active
+    // physical count if the user switches apps (e.g., to use a calculator app
+    // or answer a text message).
+    ref.keepAlive();
+    
     final db = ref.read(databaseProvider);
     final showAll = ref.watch(showAllCountItemsProvider);
     
