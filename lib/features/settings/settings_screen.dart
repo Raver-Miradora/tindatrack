@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'settings_controller.dart';
 import '../../core/providers.dart';
 import '../../core/logic/haptics.dart';
+import '../reports/pdf_export_service.dart';
+import '../auth/widgets/pin_pad_dialog.dart';
+import 'seed_export_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -43,11 +48,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 16),
           _buildActionCard(
             context,
+            icon: Icons.password_rounded,
+            color: Colors.orange,
+            title: 'Palitan ang PIN',
+            subtitle: 'Change your Master Security PIN',
+            onTap: () {
+              showDialog(
+                context: context,
+                barrierDismissible: true,
+                builder: (ctx) => PinPadDialog(
+                  title: 'Enter Current PIN',
+                  onSuccess: () async {
+                    Navigator.of(ctx).pop();
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.remove('owner_pin');
+                    if (context.mounted) {
+                      context.go('/auth');
+                    }
+                  },
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildActionCard(
+            context,
             icon: Icons.delete_forever_rounded,
             color: Colors.red,
             title: 'Wipe All Data',
             subtitle: 'Delete all products, stock history, and logs',
-            onTap: () => _confirmWipe(context, ref),
+            onTap: () {
+              showDialog(
+                context: context,
+                barrierDismissible: true,
+                builder: (ctx) => PinPadDialog(
+                  title: 'Verify PIN to Wipe Data',
+                  onSuccess: () {
+                    Navigator.of(ctx).pop();
+                    if (context.mounted) {
+                      _confirmWipe(context, ref);
+                    }
+                  },
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           _buildActionCard(
@@ -55,10 +99,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             icon: Icons.backup_rounded,
             color: Colors.blue,
             title: 'Export Data',
-            subtitle: 'Generate a CSV report of current stock',
-            onTap: () {
+            subtitle: 'Generate a PDF report of current stock',
+            onTap: () async {
               TindaHaptics.light();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Exporting CSV... (Future Feature)')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating PDF Report...')));
+              final db = ref.read(databaseProvider);
+              final products = await db.select(db.products).get();
+              final storeName = ref.read(storeNameProvider);
+              await PdfExportService.exportInventoryReport(products, storeName);
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildActionCard(
+            context,
+            icon: Icons.code_rounded,
+            color: Colors.purple,
+            title: 'Export Bagong Paninda (Dev Tool)',
+            subtitle: 'Share unseeded products as a raw JSON string',
+            onTap: () async {
+              TindaHaptics.light();
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating Seed Data...')));
+              final db = ref.read(databaseProvider);
+              final products = await db.select(db.products).get();
+              await SeedExportService.exportNewProductsForSeed(products);
             },
           ),
           const SizedBox(height: 40),
