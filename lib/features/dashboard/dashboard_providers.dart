@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/database/database.dart';
 import '../../core/providers.dart';
 import 'package:drift/drift.dart';
+import 'package:rxdart/rxdart.dart';
 
 // HARDENING: Added .autoDispose to all providers to ensure memory is freed when screens are closed
 
@@ -131,4 +132,85 @@ final predictiveProductsProvider = Provider.autoDispose<List<PredictedProduct>>(
     loading: () => [],
     error: (_, _) => [],
   );
+});
+
+// Live Cash Drawer Math
+class LiveCashDrawerData {
+  final double baseFloat;
+  final double cashSales;
+  final double expenses;
+  final double utangPaymentsReceived;
+  final double cashLoansGiven;
+
+  double get currentCash => baseFloat + cashSales - expenses + utangPaymentsReceived - cashLoansGiven;
+
+  LiveCashDrawerData({
+    required this.baseFloat,
+    required this.cashSales,
+    required this.expenses,
+    required this.utangPaymentsReceived,
+    required this.cashLoansGiven,
+  });
+}
+
+final liveCashDrawerProvider = StreamProvider.autoDispose<LiveCashDrawerData>((ref) async* {
+  final db = ref.watch(databaseProvider);
+  final prefs = ref.watch(sharedPreferencesProvider);
+  
+  // Base float from settings
+  final baseFloat = prefs.getDouble('base_cash_float') ?? 0.0;
+  
+  // Create a combined stream of all tables that affect the drawer
+  final combinedStream = Rx.combineLatest4(
+    db.select(db.salesTransactions).watch(),
+    db.select(db.storeExpenses).watch(),
+    db.select(db.utangLedger).watch(),
+    Stream.value(baseFloat), // To trigger updates if we change it, though technically we might need to invalidate
+    (a, b, c, float) => true,
+  );
+
+  await for (final _ in combinedStream) {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    
+    // Cash Sales Today
+    final sales = await (db.select(db.salesTransactions)
+      ..where((t) => t.paymentMethod.equals('CASH'))
+      ..where((t) => t.timestamp.isBiggerOrEqualValue(startOfDay)))
+    .get();
+    final cashSales = sales.fold(0.0, (sum, t) => sum + t.totalAmount);
+
+    // Expenses Today
+    final expenses = await (db.select(db.storeExpenses)
+      ..where((t) => t.timestamp.isBiggerOrEqualValue(startOfDay)))
+    .get();
+    final totalExpenses = expenses.fold(0.0, (sum, t) => sum + t.amount);
+
+    // Utang Activity Today
+    final utangs = await (db.select(db.utangLedger)
+      ..where((t) => t.timestamp.isBiggerOrEqualValue(startOfDay)))
+    .get();
+    
+    double utangPaymentsReceived = 0.0;
+    double cashLoansGiven = 0.0;
+    
+    for (final u in utangs) {
+      if (u.amount < 0) {
+        utangPaymentsReceived += u.amount.abs();
+      } else if (u.amount > 0 && u.itemsSnapshot == 'Cash Loan') {
+        cashLoansGiven += u.amount;
+      }
+    }
+
+    // Refresh float value directly to be safe
+    final currentBaseFloat = ref.read(sharedPreferencesProvider).getDouble('base_cash_float') ?? 0.0;
+
+    yield LiveCashDrawerData(
+      baseFloat: currentBaseFloat,
+      cashSales: cashSales,
+      expenses: totalExpenses,
+      utangPaymentsReceived: utangPaymentsReceived,
+      cashLoansGiven: cashLoansGiven,
+    );
+  }
 });
