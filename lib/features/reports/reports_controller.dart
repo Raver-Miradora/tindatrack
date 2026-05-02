@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import '../../core/providers.dart';
@@ -36,13 +37,13 @@ final financialReportProvider = StreamProvider.autoDispose<FinancialReport>((ref
   final db = ref.watch(databaseProvider);
   
   final now = DateTime.now();
-  final startOfMonth = DateTime(now.year, now.month, 1);
-  final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+  final startOfDay = DateTime(now.year, now.month, now.day);
+  final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-  // Watch products and count items for updates
+  // Watch products, count items, and audit log for updates
   return db.customSelect(
     'SELECT 1', 
-    readsFrom: {db.countItems, db.products}
+    readsFrom: {db.countItems, db.products, db.auditLog}
   ).watch().asyncMap((_) async {
     
     // 1. Calculate Asset Value (ONLY for items in stock)
@@ -65,10 +66,10 @@ final financialReportProvider = StreamProvider.autoDispose<FinancialReport>((ref
       }
     }
 
-    // 2. Calculate Variance & Sales (Monthly)
+    // 2. Calculate Variance & Sales (Daily)
     final performanceQuery = db.select(db.countItems).join([
       innerJoin(db.products, db.products.id.equalsExp(db.countItems.productId)),
-    ])..where(db.countItems.countedAt.isBetweenValues(startOfMonth, endOfMonth));
+    ])..where(db.countItems.countedAt.isBetweenValues(startOfDay, endOfDay));
 
     final performanceRows = await performanceQuery.get();
     double totalSales = 0;
@@ -84,6 +85,22 @@ final financialReportProvider = StreamProvider.autoDispose<FinancialReport>((ref
         totalSales += item.variance * price;
         if (item.varianceReason != null && item.varianceReason != 'Sale') {
           shrinkage += item.variance * cost;
+        }
+      }
+    }
+
+    // 3. Add POS Sales from AuditLog
+    final posSalesQuery = db.select(db.auditLog)
+      ..where((a) => a.actionType.equals('pos_sale') & a.timestamp.isBetweenValues(startOfDay, endOfDay));
+    
+    final posSalesRows = await posSalesQuery.get();
+    for (final row in posSalesRows) {
+      if (row.afterSnapshot != null) {
+        try {
+          final data = jsonDecode(row.afterSnapshot!);
+          totalSales += (data['totalSales'] as num).toDouble();
+        } catch (e) {
+          // ignore parsing errors
         }
       }
     }
